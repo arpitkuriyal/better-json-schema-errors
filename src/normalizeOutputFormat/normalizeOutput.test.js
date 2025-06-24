@@ -1,16 +1,18 @@
 import { describe, expect, test } from "vitest";
 import { normalizeOutputFormat } from "./normalizeOutput.js";
 import { betterJsonSchemaErrors } from "../index.js";
+import { registerSchema, unregisterSchema } from "@hyperjump/json-schema/draft-2020-12";
 /**
- * @import { OutputFormat, OutputUnit, SchemaObject } from "../index.d.ts"
+ * @import { OutputFormat, OutputUnit} from "../index.d.ts"
  */
 
-describe("Error Output Normalization", () => {
+describe.only("Error Output Normalization", () => {
   test("Simple keyword with a standard Basic output format", async () => {
-    /** @type SchemaObject */
-    const schema = {
+    registerSchema({
+      $id: "https://example.com/main1",
+      $schema: "https://json-schema.org/draft/2020-12/schema",
       minLength: 3
-    };
+    });
 
     const instance = "aa";
 
@@ -19,15 +21,15 @@ describe("Error Output Normalization", () => {
       valid: false,
       errors: [
         {
-          absoluteKeywordLocation: "https://example.com/main#/minLength",
+          absoluteKeywordLocation: "https://example.com/main1#/minLength",
           instanceLocation: "#"
         }
       ]
     };
 
-    const result = await betterJsonSchemaErrors(instance, schema, output);
+    const result = await betterJsonSchemaErrors(instance, output);
     expect(result.errors).to.eql([{
-      schemaLocation: "https://example.com/main#/minLength",
+      schemaLocation: "https://example.com/main1#/minLength",
       instanceLocation: "#",
       message: "The instance should be at least 3 characters"
     }
@@ -35,13 +37,12 @@ describe("Error Output Normalization", () => {
   });
 
   test("Checking when output contain only instanceLocation and keywordLocation ", async () => {
-    /** @type SchemaObject */
-    const schema = {
-      $id: "https://example.com/main",
+    registerSchema({
+      $id: "https://example.com/main2",
       $schema: "https://json-schema.org/draft/2020-12/schema",
       minLength: 3
-    };
-
+    });
+    const schemaUri = "https://example.com/main2";
     const instance = "aa";
 
     /** @type OutputFormat */
@@ -55,20 +56,20 @@ describe("Error Output Normalization", () => {
       ]
     };
 
-    const result = await betterJsonSchemaErrors(instance, schema, output);
+    const result = await betterJsonSchemaErrors(instance, output, { schemaUri });
     expect(result.errors).to.eql([{
-      schemaLocation: "https://example.com/main#/minLength",
+      schemaLocation: "https://example.com/main2#/minLength",
       instanceLocation: "#",
       message: "The instance should be at least 3 characters"
     }]);
   });
 
   test("adding # if instanceLocation doesn't have it", async () => {
-    /** @type SchemaObject */
-    const schema = {
-      $id: "https://example.com/main",
-      minlength: 3
-    };
+    registerSchema({
+      $id: "https://example.com/main3",
+      $schema: "https://json-schema.org/draft/2020-12/schema",
+      minLength: 3
+    });
 
     const instance = "aa";
 
@@ -78,37 +79,21 @@ describe("Error Output Normalization", () => {
       errors: [
         {
           valid: false,
-          absoluteKeywordLocation: "https://example.com/main#/minLength",
+          absoluteKeywordLocation: "https://example.com/main3#/minLength",
           instanceLocation: ""
         }
       ]
     };
 
-    const result = await betterJsonSchemaErrors(instance, schema, output);
+    const result = await betterJsonSchemaErrors(instance, output);
     expect(result.errors).to.eql([{
-      schemaLocation: "https://example.com/main#/minLength",
+      schemaLocation: "https://example.com/main3#/minLength",
       instanceLocation: "#",
       message: "The instance should be at least 3 characters"
     }]);
   });
 
-  // const schema = {
-  //   type: "object",
-  //   properties: {
-  //     foo: { $ref: "#/$defs/foo" }
-  //   },
-  //   $defs: {
-  //     foo: { type: "number" }
-  //   }
-  // };
-  // const instance = { foo: true };
-  // const absoluteKeywordLocation = "/$defs/foo/type";
-  // const keywordLocation = "/properties/foo/$ref/type";
-
   test("checking for the basic output format", async () => {
-    const schema = {
-      $id: "https://example.com/polygon"
-    };
     const errorOutput = {
       valid: false,
       errors: [
@@ -136,14 +121,16 @@ describe("Error Output Normalization", () => {
       ]
     };
 
-    expect(await normalizeOutputFormat(errorOutput, schema)).to.eql([
+    expect(await normalizeOutputFormat(errorOutput)).to.eql([
       {
         valid: false,
+        keyword: "https://json-schema.org/keyword/required",
         absoluteKeywordLocation: "https://example.com/polygon#/$defs/point/required",
         instanceLocation: "#/1"
       },
       {
         valid: false,
+        keyword: "https://json-schema.org/keyword/additionalProperties",
         absoluteKeywordLocation: "https://example.com/polygon#/$defs/point/additionalProperties",
         instanceLocation: "#/1/z"
       }
@@ -151,9 +138,6 @@ describe("Error Output Normalization", () => {
   });
 
   test("checking for the detailed output format", async () => {
-    const schema = {
-      $id: "https://example.com/polygon"
-    };
     const errorOutput = {
       valid: false,
       keywordLocation: "#",
@@ -184,14 +168,16 @@ describe("Error Output Normalization", () => {
       ]
     };
 
-    expect(await normalizeOutputFormat(errorOutput, schema)).to.eql([
+    expect(await normalizeOutputFormat(errorOutput)).to.eql([
       {
         valid: false,
+        keyword: "https://json-schema.org/keyword/required",
         absoluteKeywordLocation: "https://example.com/polygon#/$defs/point/required",
         instanceLocation: "#/1"
       },
       {
         valid: false,
+        keyword: "https://json-schema.org/keyword/additionalProperties",
         absoluteKeywordLocation: "https://example.com/polygon#/$defs/point/additionalProperties",
         instanceLocation: "#/1/z"
       }
@@ -199,9 +185,6 @@ describe("Error Output Normalization", () => {
   });
 
   test("checking for the verbose output format", async () => {
-    const schema = {
-      $id: "https://example.com/polygon"
-    };
     const errorOutput = {
       valid: false,
       keywordLocation: "#",
@@ -209,22 +192,22 @@ describe("Error Output Normalization", () => {
       errors: [
         {
           valid: true,
-          absoluteKeywordLocation: "https://example.com/schema#/type",
+          absoluteKeywordLocation: "https://example.com/main4#/type",
           instanceLocation: "#"
         },
         {
           valid: true,
-          absoluteKeywordLocation: "https://example.com/schema#/properties",
+          absoluteKeywordLocation: "https://example.com/main4#/properties",
           instanceLocation: "#"
         },
         {
           valid: false,
-          absoluteKeywordLocation: "https://example.com/schema#/additionalProperties",
+          absoluteKeywordLocation: "https://example.com/main4#/additionalProperties",
           instanceLocation: "#",
           errors: [
             {
               valid: false,
-              absoluteKeywordLocation: "https://example.com/schema#/additionalProperties",
+              absoluteKeywordLocation: "https://example.com/main4#/additionalProperties",
               instanceLocation: "#/disallowedProp",
               error: "Additional property 'disallowedProp' found but was invalid."
             }
@@ -233,24 +216,23 @@ describe("Error Output Normalization", () => {
       ]
     };
 
-    expect(await normalizeOutputFormat(errorOutput, schema)).to.eql([
+    expect(await normalizeOutputFormat(errorOutput)).to.eql([
       {
         valid: false,
-        absoluteKeywordLocation: "https://example.com/schema#/additionalProperties",
+        keyword: "https://json-schema.org/keyword/additionalProperties",
+        absoluteKeywordLocation: "https://example.com/main4#/additionalProperties",
         instanceLocation: "#"
       },
       {
         valid: false,
-        absoluteKeywordLocation: "https://example.com/schema#/additionalProperties",
+        keyword: "https://json-schema.org/keyword/additionalProperties",
+        absoluteKeywordLocation: "https://example.com/main4#/additionalProperties",
         instanceLocation: "#/disallowedProp"
       }
     ]);
   });
 
   test("when error output doesnot contain any of these three keyword (valid, absoluteKeywordLocation, instanceLocation)", async () => {
-    const schema = {
-      $id: "https://example.com/polygon"
-    };
     const errorOutput = {
       valid: false,
       errors: [
@@ -260,13 +242,12 @@ describe("Error Output Normalization", () => {
         }
       ]
     };
-    await expect(async () => normalizeOutputFormat(/** @type any */(errorOutput), schema)).to.rejects.toThrow("error Output must follow Draft 2019-09");
+    await expect(async () => normalizeOutputFormat(/** @type any */(errorOutput))).to.rejects.toThrow("error Output must follow Draft 2019-09");
   });
 
   test("correctly resolves keywordLocation through $ref in $defs", async () => {
-    /** @type SchemaObject */
-    const schema = {
-      $id: "https://example.com/main",
+    registerSchema({
+      $id: "https://example.com/main5",
       $schema: "https://json-schema.org/draft/2020-12/schema",
       properties: {
         foo: { $ref: "#/$defs/lengthDefinition" }
@@ -276,7 +257,7 @@ describe("Error Output Normalization", () => {
           minLength: 3
         }
       }
-    };
+    });
     const instance = { foo: "aa" };
     /** @type OutputFormat */
     const output = {
@@ -288,21 +269,19 @@ describe("Error Output Normalization", () => {
         }
       ]
     };
-
-    const result = await betterJsonSchemaErrors(instance, schema, output);
+    const schemaUri = "https://example.com/main5";
+    const result = await betterJsonSchemaErrors(instance, output, { schemaUri });
     expect(result.errors).to.eql([
       {
-        schemaLocation: "https://example.com/main#/$defs/lengthDefinition/minLength",
+        schemaLocation: "https://example.com/main5#/$defs/lengthDefinition/minLength",
         instanceLocation: "#",
         message: "The instance should be at least 3 characters"
       }
     ]);
+    unregisterSchema(schemaUri);
   });
 
   test("removes schemaLocation nodes from the error output", async () => {
-    const schema = {
-      $id: "https://example.com/polygon"
-    };
     const errorOutput = {
       valid: false,
       errors: [
@@ -323,9 +302,10 @@ describe("Error Output Normalization", () => {
       ]
     };
 
-    expect(await normalizeOutputFormat(errorOutput, schema)).to.eql([
+    expect(await normalizeOutputFormat(errorOutput)).to.eql([
       {
         valid: false,
+        keyword: "https://json-schema.org/keyword/required",
         absoluteKeywordLocation: "https://example.com/polygon#/$defs/point/required",
         instanceLocation: "#/1"
       }
